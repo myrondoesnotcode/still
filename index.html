@@ -152,7 +152,7 @@ h2.t em{color:var(--mist)}
 .rhythm .tag{display:inline-block;margin-left:8px;font:500 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink);background:var(--mist);padding:3px 7px;border-radius:5px;vertical-align:2px}
 .track{display:flex;height:42px;border-radius:12px;overflow:hidden;gap:3px}
 .seg{position:relative;display:flex;align-items:center;padding:0 12px;font:500 12px var(--mono);letter-spacing:.03em;white-space:nowrap;overflow:hidden}
-.seg.in{background:var(--mist);color:var(--ink)} .seg.out{background:var(--water);color:var(--foam)} .seg.rest{background:rgba(17,56,71,.9);color:var(--soft)}
+.seg.in{background:var(--mist);color:var(--ink)} .seg.out{background:var(--water);color:var(--foam)} .seg.hold{background:rgba(189,217,218,.55);color:var(--ink)} .seg.rest{background:rgba(17,56,71,.9);color:var(--soft)}
 .seg .sweep{position:absolute;inset:0;background:rgba(255,255,255,.3);transform-origin:left;transform:scaleX(0)}
 .seg span{position:relative}
 
@@ -330,19 +330,19 @@ footer a{color:var(--soft)}
       <div class="panel reveal">
         <div class="mono kicker">Pace</div>
         <h2 class="t">Pick a rhythm. <em>Or don't.</em></h2>
-        <p class="intro">Three paces in the menu bar. The default leans on a long exhale with a short rest before the next breath. The start delay is yours too: 5, 8, 15 or 30 seconds.</p>
+        <p class="intro">Three paces in the menu bar. Every breath goes in, hold, out, hold. The default gives you a short pause at the top and a long, slow exhale. The start delay is yours too: 5, 8, 15 or 30 seconds.</p>
         <div class="rhythms">
-          <div class="rhythm" data-cycle="5,7,2">
-            <div class="name">Deep <span class="tag">default</span><small>5 in · 7 out · 2 rest</small></div>
-            <div class="track"><div class="seg in" style="flex:5"><i class="sweep"></i><span>in 5</span></div><div class="seg out" style="flex:7"><i class="sweep"></i><span>out 7</span></div><div class="seg rest" style="flex:2"><i class="sweep"></i><span>rest</span></div></div>
+          <div class="rhythm" data-cycle="4,2,6,2">
+            <div class="name">Easy <span class="tag">default</span><small>4 in · 2 hold · 6 out · 2 hold</small></div>
+            <div class="track"><div class="seg in" style="flex:4"><i class="sweep"></i><span>in 4</span></div><div class="seg hold" style="flex:2"><i class="sweep"></i><span>hold</span></div><div class="seg out" style="flex:6"><i class="sweep"></i><span>out 6</span></div><div class="seg rest" style="flex:2"><i class="sweep"></i><span>hold</span></div></div>
           </div>
-          <div class="rhythm" data-cycle="4,6,2">
-            <div class="name">Easy<small>4 in · 6 out · 2 rest</small></div>
-            <div class="track"><div class="seg in" style="flex:4"><i class="sweep"></i><span>in 4</span></div><div class="seg out" style="flex:6"><i class="sweep"></i><span>out 6</span></div><div class="seg rest" style="flex:2"><i class="sweep"></i><span>rest</span></div></div>
+          <div class="rhythm" data-cycle="4,4,4,4">
+            <div class="name">Box<small>4 in · 4 hold · 4 out · 4 hold</small></div>
+            <div class="track"><div class="seg in" style="flex:4"><i class="sweep"></i><span>in 4</span></div><div class="seg hold" style="flex:4"><i class="sweep"></i><span>hold</span></div><div class="seg out" style="flex:4"><i class="sweep"></i><span>out 4</span></div><div class="seg rest" style="flex:4"><i class="sweep"></i><span>hold</span></div></div>
           </div>
-          <div class="rhythm" data-cycle="4,4,0">
-            <div class="name">Even<small>4 in · 4 out · no rest</small></div>
-            <div class="track"><div class="seg in" style="flex:4"><i class="sweep"></i><span>in 4</span></div><div class="seg out" style="flex:4"><i class="sweep"></i><span>out 4</span></div></div>
+          <div class="rhythm" data-cycle="5,3,7,3">
+            <div class="name">Deep<small>5 in · 3 hold · 7 out · 3 hold</small></div>
+            <div class="track"><div class="seg in" style="flex:5"><i class="sweep"></i><span>in 5</span></div><div class="seg hold" style="flex:3"><i class="sweep"></i><span>hold</span></div><div class="seg out" style="flex:7"><i class="sweep"></i><span>out 7</span></div><div class="seg rest" style="flex:3"><i class="sweep"></i><span>hold</span></div></div>
           </div>
         </div>
       </div>
@@ -482,7 +482,7 @@ void main(){
   // Where the installer lives. Update when the release is published.
   const DOWNLOAD_URL = "https://github.com/myrondoesnotcode/still/releases/latest/download/Still.dmg";
   const SITE_URL = location.href.split('#')[0].split('?')[0];
-  const DELAY = 8, CYCLE = [5, 7, 2];
+  const DELAY = 8, CYCLE = [4, 2, 6, 2];
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   const $ = id => document.getElementById(id);
@@ -491,11 +491,12 @@ void main(){
   $('share').href = 'https://twitter.com/intent/tweet?text=' +
     encodeURIComponent("My Mac makes me breathe while my AI thinks. Don't touch anything for 8 seconds:") + '&url=' + encodeURIComponent(SITE_URL);
 
-  // Same clock as the app's BreathPhase: inhale, exhale, rest.
-  function phase(s, [a, o, r] = CYCLE) {
-    const total = a + o + r, p = ((s % total) + total) % total, n = Math.floor(s / total);
+  // Same clock as the app's BreathPhase: inhale, hold full, exhale, rest empty.
+  function phase(s, [a, h, o, r] = CYCLE) {
+    const total = a + h + o + r, p = ((s % total) + total) % total, n = Math.floor(s / total);
     if (p < a) return { name: 'in', x: (1 - Math.cos(p / a * Math.PI)) / 2, left: a - p, n };
-    if (p < a + o) { const q = (p - a) / o; return { name: 'out', x: 1 - (1 - Math.cos(q * Math.PI)) / 2, left: a + o - p, n }; }
+    if (p < a + h) return { name: 'hold', x: 1, left: a + h - p, n };
+    if (p < a + h + o) { const q = (p - a - h) / o; return { name: 'out', x: 1 - (1 - Math.cos(q * Math.PI)) / 2, left: a + h + o - p, n }; }
     return { name: 'rest', x: 0, left: total - p, n };
   }
 
@@ -722,7 +723,7 @@ void main(){
 
   // ---------- one clock for everything ----------
   const t0 = performance.now(); let prev = t0;
-  const words = { in: 'Breathe in', out: 'Breathe out', rest: 'Rest' };
+  const words = { in: 'Breathe in', hold: 'Hold', out: 'Breathe out', rest: 'Hold' };
   const macWord = $('macWord');
   function frame(now) {
     const dt = Math.min((now - prev) / 1000, .1); prev = now;
@@ -752,9 +753,8 @@ void main(){
 
     const mp = phase(t);
     if (macWord.dataset.p !== mp.name) { macWord.dataset.p = mp.name; macWord.textContent = words[mp.name]; }
-    if (!reduce) for (const r of rh) { const [a, o, s] = r.c, p = t % (a + o + s);
-      const f = [Math.min(p / a, 1), p < a ? 0 : Math.min((p - a) / o, 1), s ? (p < a + o ? 0 : (p - a - o) / s) : 0];
-      r.s.forEach((el, i) => el.style.transform = `scaleX(${f[i]})`); }
+    if (!reduce) for (const r of rh) { const p = t % r.c.reduce((x, y) => x + y); let at = 0;
+      r.s.forEach((el, i) => { const d = r.c[i]; el.style.transform = `scaleX(${Math.min(Math.max((p - at) / d, 0), 1)})`; at += d; }); }
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);

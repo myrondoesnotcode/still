@@ -59,10 +59,10 @@ void main(){
 </script>
 <script>
 (() => {
-  // The app injects window.STILL = { inhale, exhale, rest, elapsed, reduce } before load.
+  // The app injects window.STILL = { inhale, hold, exhale, rest, elapsed, reduce } before load.
   // The website passes the same settings in the query string instead.
   const query = Object.fromEntries([...new URLSearchParams(location.search)].map(([k, v]) => [k, k === 'reduce' ? v === '1' : +v]));
-  const cfg = Object.assign({ inhale: 5, exhale: 7, rest: 2, elapsed: 0, reduce: false }, query, window.STILL || {});
+  const cfg = Object.assign({ inhale: 4, hold: 2, exhale: 6, rest: 2, elapsed: 0, reduce: false }, query, window.STILL || {});
   const canvas = document.getElementById('sea');
   const gl = canvas.getContext('webgl', { antialias: false });
   if (!gl) return;
@@ -116,12 +116,13 @@ void main(){
     gl.viewport(0, 0, canvas.width, canvas.height);
   }
   resize(); addEventListener('resize', resize);
-  // Same clock as the app's BreathPhase: eased inhale, eased exhale, then rest.
+  // Same clock as the app's BreathPhase: eased inhale, hold full, eased exhale, then rest.
   function expansion(s) {
-    const a = Math.max(1, cfg.inhale), o = Math.max(1, cfg.exhale), r = Math.max(0, cfg.rest);
-    const p = s % (a + o + r);
+    const a = Math.max(1, cfg.inhale), h = Math.max(0, cfg.hold || 0), o = Math.max(1, cfg.exhale), r = Math.max(0, cfg.rest);
+    const p = s % (a + h + o + r);
     if (p < a) return (1 - Math.cos(p / a * Math.PI)) / 2;
-    if (p < a + o) return 1 - (1 - Math.cos((p - a) / o * Math.PI)) / 2;
+    if (p < a + h) return 1;
+    if (p < a + h + o) return 1 - (1 - Math.cos((p - a - h) / o * Math.PI)) / 2;
     return 0;
   }
   function draw(t, swell) {
