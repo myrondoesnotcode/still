@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Still — breathe while your AI thinks</title>
+<meta name="description" content="Still is a Mac menu bar app. When Claude or Codex is working and you let go of the mouse, it turns the wait into a slow breathing break.">
+<meta property="og:title" content="Still — breathe while your AI thinks">
+<meta property="og:description" content="Don't touch anything for 8 seconds.">
+<meta property="og:image" content="https://myrondoesnotcode.github.io/still/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://myrondoesnotcode.github.io/still/">
+<meta name="twitter:image" content="https://myrondoesnotcode.github.io/still/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#071C29">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300;1,6..72,400&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#071C29; --depth:#113847; --water:#508C93; --mist:#BDD9DA; --foam:#E4EEEE;
+  --line:rgba(189,217,218,.16); --soft:rgba(228,238,238,.68);
+  --glass:rgba(7,28,41,.52);
+  --display:"Newsreader",Georgia,serif; --body:"Figtree",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --gutter:clamp(16px,4vw,48px);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--ink);color:var(--foam);font:400 17px/1.55 var(--body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body.breathing{overflow:hidden}
+a{color:inherit}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--mist);outline-offset:3px;border-radius:6px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 var(--gutter)}
+.mono{font-family:var(--mono);font-size:12.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--soft)}
+em{font-style:italic}
+
+/* the sea: one living backdrop for the whole story */
+#sea{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block}
+.fallback-sea{position:fixed;inset:0;z-index:0;background:linear-gradient(180deg,#0B1A24 0%,#2E4B58 48%,#0A2432 52%,#071C29 100%)}
+main,header,footer{position:relative;z-index:2}
+main,footer{transition:opacity 1.2s ease}
+body.breathing main,body.breathing footer{opacity:0;pointer-events:none}
+
+/* header */
+.bar{position:fixed;inset:0 0 auto 0;z-index:30;transition:opacity .6s ease}
+.bar::before{content:"";position:absolute;inset:0 0 -28px 0;background:linear-gradient(rgba(7,28,41,.55),rgba(7,28,41,0));pointer-events:none;z-index:-1}
+body.breathing .bar{opacity:0;pointer-events:none}
+.bar .wrap{display:flex;align-items:center;justify-content:space-between;height:68px}
+.mark{display:flex;align-items:center;gap:10px;font:500 18px/1 var(--body);text-decoration:none}
+.mark svg{width:20px;height:20px}
+.bar nav{display:flex;gap:10px;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;border:1px solid var(--line);
+  background:rgba(7,28,41,.35);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);text-decoration:none;font-size:14px;cursor:pointer}
+.pill:hover{background:rgba(7,28,41,.6)}
+.pill svg{width:15px;height:15px}
+.pill.solid{background:var(--foam);color:var(--ink);border-color:transparent;font-weight:600}
+.pill.solid:hover{background:#fff}
+
+/* ACT 1 — the restless wait */
+.act1{height:260vh;position:relative}
+.stage{position:sticky;top:0;height:100svh;overflow:hidden;display:grid;place-items:center}
+.clutter{position:absolute;inset:0;pointer-events:none}
+.junk{position:absolute;border-radius:14px;border:1px solid rgba(228,238,238,.14);background:rgba(10,30,42,.72);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 20px 60px rgba(0,0,0,.35);
+  font:400 13px/1.4 var(--body);color:var(--foam);padding:12px 14px;will-change:transform,opacity,filter}
+.junk .t{font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:rgba(228,238,238,.5);margin-bottom:6px}
+.spin{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid rgba(228,238,238,.2);border-top-color:var(--foam);
+  animation:spin .8s linear infinite;vertical-align:-2px;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#E2574C;color:#fff;font:600 11px var(--body);margin-left:6px}
+.bars{display:flex;gap:4px;margin-top:8px}.bars i{height:6px;border-radius:3px;background:rgba(228,238,238,.18)}
+.cursor{position:absolute;left:0;top:0;width:22px;height:22px;will-change:transform}
+.say{position:relative;text-align:center;padding:0 var(--gutter);width:100%;max-width:1000px}
+.say .line{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);opacity:0;transition:opacity .7s ease,filter .7s ease;filter:blur(8px);text-shadow:0 2px 40px rgba(7,28,41,.6)}
+.say .line.on{opacity:1;filter:none}
+.say .line em{color:var(--mist)}
+.say .lines{position:relative;height:2.2em;font:300 clamp(44px,8vw,112px)/.98 var(--display);letter-spacing:-.02em}
+.scrollcue{position:absolute;bottom:max(26px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity .5s}
+.scrollcue i{width:1px;height:38px;background:linear-gradient(var(--mist),transparent);animation:cue 2.4s ease-in-out infinite}
+@keyframes cue{0%{transform:scaleY(0);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}51%{transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
+
+/* ACT 2 — the dare */
+.act2{height:160vh;position:relative}
+.dare{display:flex;flex-direction:column;align-items:center;gap:26px;text-align:center;padding:0 var(--gutter)}
+.dare h2{font:300 clamp(44px,8vw,110px)/.98 var(--display);letter-spacing:-.02em;margin:0;max-width:12ch;text-shadow:0 2px 40px rgba(7,28,41,.55)}
+.dare h2 em{color:var(--mist)}
+.ring{width:96px;height:96px}
+.ring circle{fill:none;stroke-width:2}
+.ring .track{stroke:rgba(228,238,238,.18)}
+.ring .fill{stroke:var(--foam);stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%}
+.ring text{fill:var(--foam);font:300 34px var(--display);text-anchor:middle;dominant-baseline:central}
+.dare .msg{min-height:1.4em}
+.dare .skip{font-size:14px;color:var(--soft)}
+
+/* the breath */
+.breath{position:fixed;inset:0;z-index:40;display:grid;place-items:center;opacity:0;visibility:hidden;transition:opacity 1.4s ease,visibility 0s 1.4s;cursor:pointer}
+.breath.on{opacity:1;visibility:visible;transition:opacity 1.6s ease}
+.breath .chip{position:absolute;top:max(24px,env(safe-area-inset-top));left:var(--gutter);display:flex;gap:9px;align-items:center}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--mist);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+.breath .tally{position:absolute;top:max(24px,env(safe-area-inset-top));right:var(--gutter)}
+.phase{text-align:center;pointer-events:none}
+.phase .word{font:300 italic clamp(48px,7vw,96px)/1 var(--display);letter-spacing:-.01em;text-shadow:0 2px 50px rgba(7,28,41,.5)}
+.phase .count{margin-top:16px}
+.breath .leave{position:absolute;bottom:max(28px,env(safe-area-inset-bottom));left:0;right:0;text-align:center}
+
+/* chapters */
+.chapter{min-height:100svh;display:flex;align-items:center;padding:120px 0}
+.chapter > .wrap{width:100%}
+.panel{background:var(--glass);border:1px solid var(--line);border-radius:28px;padding:clamp(28px,4.5vw,64px);
+  backdrop-filter:blur(18px) saturate(1.1);-webkit-backdrop-filter:blur(18px) saturate(1.1);box-shadow:0 30px 90px rgba(4,14,22,.35)}
+.kicker{margin-bottom:18px}
+h2.t{font:300 clamp(36px,5vw,68px)/1.02 var(--display);letter-spacing:-.015em;margin:0 0 20px;max-width:16ch}
+h2.t em{color:var(--mist)}
+.intro{color:var(--soft);max-width:36rem;margin:0}
+
+/* return */
+.return .wrap{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(28px,5vw,72px);align-items:center}
+.answer{border-radius:18px;background:rgba(7,28,41,.78);border:1px solid var(--line);padding:22px;font-size:15px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.answer .hd{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.answer .ok{width:22px;height:22px;border-radius:50%;background:var(--mist);color:var(--ink);display:grid;place-items:center;font-size:13px;font-weight:700}
+.answer pre{margin:14px 0 0;padding:14px;border-radius:12px;background:rgba(0,0,0,.25);font:400 12.5px/1.7 var(--mono);color:var(--mist);white-space:pre-wrap}
+.answer .note{margin-top:12px;font-size:12px;color:rgba(228,238,238,.45)}
+.sharebox{margin-top:28px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+
+/* product */
+.mac{position:relative;aspect-ratio:16/10;border-radius:18px;padding:10px;background:linear-gradient(#27333a,#141b20);box-shadow:0 40px 100px rgba(0,0,0,.45),inset 0 0 0 1px rgba(255,255,255,.08)}
+.screen{position:relative;height:100%;border-radius:10px;overflow:hidden;background:radial-gradient(90% 90% at 48% 42%,var(--depth),var(--ink) 70%)}
+.screen .menubar{position:absolute;z-index:1;inset:0 0 auto 0;height:22px;display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:0 12px;background:rgba(0,0,0,.18);font:500 10px var(--body);color:rgba(228,238,238,.8)}
+.screen .menubar svg{width:12px;height:12px}
+#macSea{position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none}
+.screen .shade{position:absolute;inset:0;background:radial-gradient(circle at 50% 52%,rgba(7,28,41,.32),transparent 55%);pointer-events:none}
+.screen .w{position:absolute;left:0;right:0;top:52%;transform:translateY(-50%);text-align:center;font:300 italic clamp(22px,3vw,40px) var(--display);text-shadow:0 2px 20px rgba(7,28,41,.5)}
+.screen .c{position:absolute;z-index:1;top:32px;left:14px;font:500 9px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:rgba(228,238,238,.6)}
+.product .wrap{display:grid;grid-template-columns:.9fr 1.1fr;gap:clamp(28px,5vw,72px);align-items:center}
+
+/* manners */
+.rules{list-style:none;margin:28px 0 0;padding:0}
+.rules li{display:grid;grid-template-columns:1fr auto;gap:18px;padding:18px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.rules li:first-child{border-top:1px solid var(--line)}
+.rules b{font-weight:500}
+.rules span{font:400 12.5px var(--mono);color:var(--mist);opacity:.75;text-align:right}
+.manners .wrap{display:grid;grid-template-columns:.9fr 1.1fr;gap:clamp(28px,5vw,72px);align-items:start}
+
+/* rhythm */
+.rhythms{margin-top:40px;display:grid;gap:10px}
+.rhythm{display:grid;grid-template-columns:minmax(140px,200px) 1fr;gap:22px;align-items:center;padding:12px 0}
+.rhythm .name{font:500 16px var(--body)}
+.rhythm .name small{display:block;font:400 12px var(--mono);color:var(--soft);margin-top:4px;letter-spacing:.03em}
+.rhythm .tag{display:inline-block;margin-left:8px;font:500 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink);background:var(--mist);padding:3px 7px;border-radius:5px;vertical-align:2px}
+.track{display:flex;height:42px;border-radius:12px;overflow:hidden;gap:3px}
+.seg{position:relative;display:flex;align-items:center;padding:0 12px;font:500 12px var(--mono);letter-spacing:.03em;white-space:nowrap;overflow:hidden}
+.seg.in{background:var(--mist);color:var(--ink)} .seg.out{background:var(--water);color:var(--foam)} .seg.rest{background:rgba(17,56,71,.9);color:var(--soft)}
+.seg .sweep{position:absolute;inset:0;background:rgba(255,255,255,.3);transform-origin:left;transform:scaleX(0)}
+.seg span{position:relative}
+
+/* works + privacy */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(20px,3vw,32px)}
+.cards{display:grid;gap:12px;margin-top:26px}
+.card{padding:18px 20px;border:1px solid var(--line);border-radius:16px;background:rgba(17,56,71,.4)}
+.card h3{margin:0 0 4px;font:500 17px var(--body)}
+.card p{margin:0;color:var(--soft);font-size:15px}
+.card.no{background:transparent;border-style:dashed}
+
+/* download */
+.download{text-align:center}
+.download .panel{max-width:820px;margin:0 auto}
+.download h2.t{margin-left:auto;margin-right:auto}
+.download .intro{margin:0 auto}
+.download ol{list-style:none;counter-reset:i;padding:0;margin:36px auto;max-width:600px;text-align:left}
+.download ol li{counter-increment:i;display:grid;grid-template-columns:40px 1fr;padding:14px 0;border-bottom:1px solid var(--line)}
+.download ol li::before{content:counter(i);font:500 13px var(--mono);color:var(--mist)}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:16px 26px;border-radius:999px;background:var(--foam);color:var(--ink);
+  font:600 16px/1 var(--body);text-decoration:none;border:0;cursor:pointer;transition:transform .2s ease,background .2s ease}
+.btn:hover{transform:translateY(-1px);background:#fff}
+.btn svg{width:18px;height:18px}
+.btn.ghost{background:rgba(7,28,41,.4);color:var(--foam);border:1px solid var(--line)}
+.btn.ghost:hover{background:rgba(7,28,41,.7)}
+.cta{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;align-items:center}
+.fine{font-size:13.5px;color:var(--soft)}
+
+footer{padding:36px 0 44px}
+footer .wrap{display:flex;flex-wrap:wrap;gap:12px 28px;justify-content:space-between;color:var(--soft);font-size:14px}
+footer a{color:var(--soft)}
+
+.reveal{opacity:0;transform:translateY(28px);transition:opacity 1.2s ease,transform 1.2s cubic-bezier(.2,.7,.2,1)}
+.reveal.in{opacity:1;transform:none}
+
+@media (max-width:900px){
+  .return .wrap,.product .wrap,.manners .wrap,.split{grid-template-columns:1fr}
+  .rhythm{grid-template-columns:1fr;gap:8px}
+  .bar .hide-s{display:none}
+}
+@media (max-width:520px){
+  .seg{padding:0 8px;font-size:11px}
+  .junk{font-size:12px;max-width:62vw}
+}
+@media (prefers-reduced-motion:reduce){
+  .reveal{opacity:1;transform:none;transition:none}
+  .spin,.dot,.scrollcue i{animation:none}
+  .breath,.breath.on,.say .line{transition:none}
+}
+</style>
+</head>
+<body>
+<canvas id="sea" aria-hidden="true"></canvas>
+
+<header class="bar">
+  <div class="wrap">
+    <a class="mark" href="#top" aria-label="Still, back to top">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 1.5a8.5 8.5 0 0 0 0 17z" fill="currentColor"/></svg>
+      Still
+    </a>
+    <nav>
+      <button class="pill" id="sound" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path id="waves" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".35"/></svg>
+        <span id="soundLabel">Sound off</span>
+      </button>
+      <a class="pill solid hide-s" href="#download">Download</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <!-- ACT 1: the restless wait -->
+  <section class="act1" id="act1" data-scene="restless">
+    <div class="stage">
+      <div class="clutter" id="clutter" aria-hidden="true">
+        <div class="junk" style="left:7%;top:16%;width:250px"><div class="t">Claude</div><span class="spin"></span>Thinking… <span class="mono" id="clock" style="font-size:11px">0:04</span></div>
+        <div class="junk" style="right:8%;top:13%;width:210px"><div class="t">Messages</div>3 new messages<span class="badge">3</span></div>
+        <div class="junk" style="left:12%;bottom:18%;width:230px"><div class="t">Codex</div><span class="spin"></span>Running tests…<div class="bars"><i style="width:40%"></i><i style="width:25%"></i><i style="width:18%"></i></div></div>
+        <div class="junk" style="right:12%;bottom:22%;width:250px"><div class="t">Browser · 14 tabs</div>You opened a new tab<span class="badge">14</span></div>
+        <div class="junk" style="left:38%;top:7%;width:190px"><div class="t">Mail</div>Inbox<span class="badge">27</span></div>
+        <div class="junk" style="right:30%;bottom:9%;width:170px"><div class="t">Claude</div><span class="spin"></span>Still thinking…</div>
+        <svg class="cursor" id="cur" viewBox="0 0 24 24"><path d="M4 2l16 10-7 1.5L9.5 21z" fill="#E4EEEE" stroke="#071C29" stroke-width="1.2"/></svg>
+      </div>
+      <div class="say">
+        <div class="mono" style="margin-bottom:22px">A Mac app for people who wait on AI</div>
+        <div class="lines" id="lines" role="heading" aria-level="1">
+          <div class="line on">You asked.<br><em>Now you wait.</em></div>
+          <div class="line">So you open a tab.<br><em>Then another.</em></div>
+          <div class="line">What if the wait<br><em>was the point?</em></div>
+        </div>
+      </div>
+      <div class="scrollcue mono" id="cue">Scroll<i></i></div>
+    </div>
+  </section>
+
+  <!-- ACT 2: the dare -->
+  <section class="act2" id="act2" data-scene="letgo">
+    <div class="stage">
+      <div class="dare">
+        <h2>Don't touch anything for <em>8&nbsp;seconds.</em></h2>
+        <svg class="ring" viewBox="0 0 96 96" aria-hidden="true"><circle class="track" cx="48" cy="48" r="44"/><circle class="fill" id="ringFill" cx="48" cy="48" r="44"/><text x="48" y="50" id="ringNum">8</text></svg>
+        <div class="mono msg" id="dareMsg" role="status" aria-live="polite">Hands off the mouse and keyboard</div>
+        <a class="skip" href="#return">Or skip ahead</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ACT 3: the return -->
+  <section class="chapter return" id="return" data-scene="day">
+    <div class="wrap">
+      <div class="panel reveal">
+        <div class="mono kicker" id="retKicker">That's Still</div>
+        <h2 class="t" id="retTitle">You got your answer. <em>And a breath.</em></h2>
+        <p class="intro">Still lives in your menu bar. Whenever Claude or Codex is working and you let go for 8 seconds, your Mac turns the wait into a slow tide. The moment the answer is ready, it steps aside.</p>
+        <div class="sharebox" id="sharebox" hidden>
+          <button class="btn" id="makeCard">Make my breath card</button>
+          <span class="fine" id="shareNote"></span>
+        </div>
+      </div>
+      <div class="answer reveal" aria-label="Example of a finished answer">
+        <div class="hd"><span class="ok">✓</span><b>Claude finished</b><span class="mono" style="margin-left:auto;font-size:11px">while you breathed</span></div>
+        Refactored the auth module and updated its tests.
+        <pre>✓ 6 files changed
+✓ 24 tests passed
+→ Ready for your review</pre>
+        <div class="note">Illustration</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- product -->
+  <section class="chapter product" data-scene="morning">
+    <div class="wrap">
+      <div class="panel reveal">
+        <div class="mono kicker">What you'll see</div>
+        <h2 class="t">A tide, <em>not a timer.</em></h2>
+        <p class="intro">No streaks, no scores, no notifications. Every display fills with slow water that swells as you breathe in and settles as you breathe out. The sky follows your clock: stars at night, a low sun at sunset. Click or press Esc and you're back instantly.</p>
+      </div>
+      <div class="mac reveal" aria-label="Still's breathing screen on a Mac">
+        <div class="screen">
+          <div class="menubar"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 1.5a8.5 8.5 0 0 0 0 17z" fill="currentColor"/></svg><span>Mon 9:41</span></div>
+          <div class="c">● Codex is working</div>
+          <iframe id="macSea" title="Still's ocean" tabindex="-1" aria-hidden="true" loading="lazy"></iframe>
+          <div class="shade"></div>
+          <div class="w" id="macWord">Breathe in</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- manners -->
+  <section class="chapter manners" data-scene="noon">
+    <div class="wrap">
+      <div class="panel reveal">
+        <div class="mono kicker">Good manners</div>
+        <h2 class="t">It knows when to <em>leave you alone.</em></h2>
+        <p class="intro">A break you didn't ask for is just another interruption. So Still is picky about when it shows up.</p>
+      </div>
+      <div class="panel reveal">
+        <ul class="rules" style="margin-top:0">
+          <li><b>Only for the chat you're looking at.</b><span>other chats never trigger it</span></li>
+          <li><b>Half-written message? It waits.</b><span>drafts pause breaks</span></li>
+          <li><b>Typing, clicking or scrolling resets the count.</b><span>8 idle seconds</span></li>
+          <li><b>Switch chats or apps and it's gone.</b><span>right away</span></li>
+          <li><b>Your AI needs permission? You're back.</b><span>no missed prompts</span></li>
+          <li><b>Click or press Esc to skip.</b><span>for that request</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- rhythm -->
+  <section class="chapter" data-scene="afternoon">
+    <div class="wrap">
+      <div class="panel reveal">
+        <div class="mono kicker">Pace</div>
+        <h2 class="t">Pick a rhythm. <em>Or don't.</em></h2>
+        <p class="intro">Three paces in the menu bar. The default leans on a long exhale with a short rest before the next breath. The start delay is yours too: 5, 8, 15 or 30 seconds.</p>
+        <div class="rhythms">
+          <div class="rhythm" data-cycle="5,7,2">
+            <div class="name">Deep <span class="tag">default</span><small>5 in · 7 out · 2 rest</small></div>
+            <div class="track"><div class="seg in" style="flex:5"><i class="sweep"></i><span>in 5</span></div><div class="seg out" style="flex:7"><i class="sweep"></i><span>out 7</span></div><div class="seg rest" style="flex:2"><i class="sweep"></i><span>rest</span></div></div>
+          </div>
+          <div class="rhythm" data-cycle="4,6,2">
+            <div class="name">Easy<small>4 in · 6 out · 2 rest</small></div>
+            <div class="track"><div class="seg in" style="flex:4"><i class="sweep"></i><span>in 4</span></div><div class="seg out" style="flex:6"><i class="sweep"></i><span>out 6</span></div><div class="seg rest" style="flex:2"><i class="sweep"></i><span>rest</span></div></div>
+          </div>
+          <div class="rhythm" data-cycle="4,4,0">
+            <div class="name">Even<small>4 in · 4 out · no rest</small></div>
+            <div class="track"><div class="seg in" style="flex:4"><i class="sweep"></i><span>in 4</span></div><div class="seg out" style="flex:4"><i class="sweep"></i><span>out 4</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- works with + privacy -->
+  <section class="chapter" data-scene="dusk">
+    <div class="wrap split">
+      <div class="panel reveal">
+        <div class="mono kicker">Works with</div>
+        <h2 class="t">Two assistants. <em>One exhale.</em></h2>
+        <div class="cards">
+          <div class="card"><h3>Codex app</h3><p>Connect it in Still's setup, then trust Still once in Codex's /hooks.</p></div>
+          <div class="card"><h3>Claude desktop · Code tab</h3><p>Connect it in Still's setup, then start a new chat.</p></div>
+          <div class="card no"><h3>Not yet</h3><p>Regular Claude chat and ChatGPT aren't connected. You can take a break from the menu bar any time.</p></div>
+        </div>
+      </div>
+      <div class="panel reveal">
+        <div class="mono kicker">Privacy</div>
+        <h2 class="t">Nothing leaves <em>your Mac.</em></h2>
+        <ul class="rules">
+          <li><b>No network requests.</b><span>none</span></li>
+          <li><b>Never saves your prompts or answers.</b><span>not stored</span></li>
+          <li><b>Signals are tiny.</b><span>app · chat ID · event · time</span></li>
+          <li><b>No account.</b><span>just download</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- download -->
+  <section class="chapter download" id="download" data-scene="night">
+    <div class="wrap">
+      <div class="panel reveal">
+        <div class="mono kicker">Get Still</div>
+        <h2 class="t">A few minutes of setup. <em>Then just wait.</em></h2>
+        <p class="intro">Still is a small Mac beta. Automatic breaks are new, so expect a few rough edges.</p>
+        <ol>
+          <li>Open the download and drag Still into Applications.</li>
+          <li>Open Still, then choose Setup &amp; connections from the half-circle in your menu bar.</li>
+          <li>Allow Still in Accessibility settings. That's how it knows which chat is on screen.</li>
+          <li>Connect Claude, Codex or both, then start a new chat.</li>
+        </ol>
+        <div class="cta">
+          <a class="btn" data-download-link href="#">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Download Still for Mac
+          </a>
+          <a class="btn ghost" id="share" href="#" target="_blank" rel="noopener">Share</a>
+        </div>
+        <p class="fine" style="margin:18px 0 0">macOS 13 or later · Apple silicon &amp; Intel · Notarized by Apple</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Still · made by Myron</span>
+    <a href="#act2" id="again">Take the 8 seconds again</a>
+  </div>
+</footer>
+
+<div class="breath" id="breath" role="dialog" aria-modal="true" aria-label="Breathing break" tabindex="-1">
+  <div class="chip mono"><span class="dot"></span>Claude is working</div>
+  <div class="tally mono" id="tally"></div>
+  <div class="phase"><div class="word" id="word">Breathe in</div><div class="count mono" id="count"></div></div>
+  <div class="leave mono">Click or press Esc to return</div>
+</div>
+
+<script id="fs" type="x-shader/x-fragment">
+precision highp float;
+uniform vec2 R; uniform float T; uniform float calm; uniform float swell; uniform float stars;
+uniform vec3 skyTop, skyHor, seaCol, sunCol; uniform float sunH;
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+  return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y); }
+float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++){ v += a*noise(p); p = p*2.03 + 7.1; a *= 0.5; } return v; }
+// Sea height: long swells plus chop that fades as the scene calms.
+float sea(vec2 p){
+  float chop = mix(1.0, 0.12, calm);
+  float h = 0.0;
+  h += 0.55*sin(p.x*0.18 + p.y*0.05 + T*0.35);
+  h += 0.30*sin(p.x*-0.09 + p.y*0.21 + T*0.27);
+  vec2 q = p*0.45 + vec2(T*0.12, T*0.07);
+  h += chop*(fbm(q) - 0.5)*1.6;
+  h += chop*0.5*(noise(p*1.7 - T*0.5) - 0.5);
+  return h;
+}
+vec3 sky(vec3 rd, vec3 sd){
+  float y = max(rd.y, 0.0);
+  vec3 c = mix(skyHor, skyTop, pow(y, 0.55));
+  float s = max(dot(rd, sd), 0.0);
+  c += sunCol*(pow(s, 900.0)*2.2 + pow(s, 24.0)*0.22 + pow(s, 4.0)*0.08);
+  float m = fbm(vec2(rd.x*3.0 + T*0.01, rd.y*14.0));
+  c = mix(c, skyHor*1.05, smoothstep(0.35, 0.0, y)*m*0.45);
+  vec2 g = floor(rd.xy*420.0);
+  float st = step(0.9965, hash(g))*smoothstep(0.02, 0.25, y);
+  c += stars*st*(0.6 + 0.4*sin(T*1.7 + hash(g+3.0)*20.0));
+  return c;
+}
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5*R) / R.y;
+  float camH = 1.35 + swell*0.18;
+  float horizon = 0.06 - swell*0.025;
+  vec3 rd = normalize(vec3(uv.x, uv.y - horizon, 1.25));
+  vec3 sd = normalize(vec3(0.42, sunH, 1.0));
+  vec3 col;
+  if (rd.y >= 0.0) {
+    col = sky(rd, sd);
+  } else {
+    float t = camH / -rd.y;
+    vec2 p = rd.xz*t + vec2(0.0, T*0.6);
+    float e = 0.02 + t*0.004;
+    float k = mix(0.55, 0.16, calm) + swell*0.05;
+    float h0 = sea(p), hx = sea(p + vec2(e, 0.0)), hz = sea(p + vec2(0.0, e));
+    vec3 n = normalize(vec3(-(hx - h0)/e*k, 1.0, -(hz - h0)/e*k));
+    vec3 rf = reflect(rd, n);
+    rf.y = abs(rf.y);
+    float fres = 0.04 + 0.96*pow(1.0 - max(dot(-rd, n), 0.0), 5.0);
+    vec3 deep = seaCol*(0.55 + 0.35*swell);
+    col = mix(deep, sky(rf, sd), fres);
+    float glint = pow(max(dot(rf, sd), 0.0), mix(90.0, 700.0, calm));
+    col += sunCol*glint*mix(1.4, 2.6, calm);
+    col = mix(col, skyHor, 1.0 - exp(-t*0.018));
+  }
+  vec2 q = gl_FragCoord.xy / R;
+  col *= 0.78 + 0.22*pow(16.0*q.x*q.y*(1.0 - q.x)*(1.0 - q.y), 0.22);
+  col += (hash(gl_FragCoord.xy + fract(T)*97.0) - 0.5)*0.035;
+  gl_FragColor = vec4(pow(max(col, 0.0), vec3(0.95)), 1.0);
+}
+</script>
+
+<script>
+(() => {
+  // Where the installer lives. Update when the release is published.
+  const DOWNLOAD_URL = "https://github.com/myrondoesnotcode/still/releases/latest/download/Still.dmg";
+  const SITE_URL = location.href.split('#')[0].split('?')[0];
+  const DELAY = 8, CYCLE = [5, 7, 2];
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  const $ = id => document.getElementById(id);
+
+  document.querySelectorAll('[data-download-link]').forEach(a => a.href = DOWNLOAD_URL);
+  $('share').href = 'https://twitter.com/intent/tweet?text=' +
+    encodeURIComponent("My Mac makes me breathe while my AI thinks. Don't touch anything for 8 seconds:") + '&url=' + encodeURIComponent(SITE_URL);
+
+  // Same clock as the app's BreathPhase: inhale, exhale, rest.
+  function phase(s, [a, o, r] = CYCLE) {
+    const total = a + o + r, p = ((s % total) + total) % total, n = Math.floor(s / total);
+    if (p < a) return { name: 'in', x: (1 - Math.cos(p / a * Math.PI)) / 2, left: a - p, n };
+    if (p < a + o) { const q = (p - a) / o; return { name: 'out', x: 1 - (1 - Math.cos(q * Math.PI)) / 2, left: a + o - p, n }; }
+    return { name: 'rest', x: 0, left: total - p, n };
+  }
+
+  let breathing = false;
+
+  // ---------- scenes: the light moves through a day as you scroll ----------
+  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+  const S = (skyTop, skyHor, sea, sun, sunH, calm, stars = 0) => ({ skyTop: hex(skyTop), skyHor: hex(skyHor), sea: hex(sea), sun: hex(sun), sunH, calm, stars });
+  const scenes = {
+    restless:  S('#0A1620', '#34505C', '#081C28', '#8FA9B2', 0.015, 0.0, 0.25),
+    letgo:     S('#0A1A26', '#3E5E69', '#0A2230', '#BDD9DA', 0.03, 0.45, 0.1),
+    breath:    S('#123447', '#D4B6A8', '#0F3446', '#FFE6CF', 0.03, 1.0),
+    day:       S('#4E7F8C', '#CFE2E0', '#1B4E5C', '#FFF7EC', 0.22, 0.85),
+    morning:   S('#3F7280', '#C4DCDA', '#174757', '#FFF1DE', 0.12, 0.9),
+    noon:      S('#5A8A96', '#D9E9E6', '#1F5563', '#FFFFFF', 0.4, 0.8),
+    afternoon: S('#3B6A79', '#C9DBD5', '#194A58', '#FFEBD2', 0.1, 0.8),
+    dusk:      S('#1A2A44', '#C48E86', '#13303F', '#FFB894', 0.008, 0.9, 0.15),
+    night:     S('#030C14', '#15303F', '#05161F', '#DCE7EE', 0.09, 0.95, 1.0),
+  };
+  const cur = JSON.parse(JSON.stringify(scenes.restless));
+  let sceneTarget = 'restless';
+  const sections = [...document.querySelectorAll('[data-scene]')];
+  function pickScene() {
+    if (breathing) return 'breath';
+    const mid = innerHeight / 2;
+    for (const s of sections) { const r = s.getBoundingClientRect(); if (r.top <= mid && r.bottom >= mid) return s.dataset.scene; }
+    return sections[sections.length - 1].getBoundingClientRect().top < mid ? 'night' : 'restless';
+  }
+  function ease(dt) {
+    const tg = scenes[sceneTarget], k = 1 - Math.exp(-dt * (breathing ? 0.9 : 1.6));
+    for (const key of ['skyTop', 'skyHor', 'sea', 'sun']) for (let i = 0; i < 3; i++) cur[key][i] += (tg[key][i] - cur[key][i]) * k;
+    for (const key of ['sunH', 'calm', 'stars']) cur[key] += (tg[key] - cur[key]) * k;
+  }
+
+  // ---------- the sea (WebGL) ----------
+  const canvas = $('sea');
+  const gl = canvas.getContext('webgl', { antialias: false, preserveDrawingBuffer: true });
+  const U = {};
+  let glOK = !!gl;
+  if (gl) {
+    const vs = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vs, 'attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}'); gl.compileShader(vs);
+    const fs = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fs, $('fs').textContent); gl.compileShader(fs);
+    if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(fs)); glOK = false; }
+    const pr = gl.createProgram(); gl.attachShader(pr, vs); gl.attachShader(pr, fs); gl.linkProgram(pr); gl.useProgram(pr);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(pr, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    for (const n of ['R', 'T', 'calm', 'swell', 'stars', 'skyTop', 'skyHor', 'seaCol', 'sunCol', 'sunH']) U[n] = gl.getUniformLocation(pr, n);
+  }
+  if (!glOK) { canvas.remove(); const f = document.createElement('div'); f.className = 'fallback-sea'; document.body.prepend(f); }
+  const small = matchMedia('(max-width: 700px)').matches;
+  function resize() {
+    if (!glOK) return;
+    const s = Math.min(devicePixelRatio || 1, 2) * (small ? 0.5 : 0.62);
+    canvas.width = Math.round(innerWidth * s); canvas.height = Math.round(innerHeight * s);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  resize(); addEventListener('resize', resize);
+  function drawSea(t, swell) {
+    if (!glOK) return;
+    gl.uniform2f(U.R, canvas.width, canvas.height); gl.uniform1f(U.T, t);
+    gl.uniform1f(U.calm, cur.calm); gl.uniform1f(U.swell, swell); gl.uniform1f(U.stars, cur.stars); gl.uniform1f(U.sunH, cur.sunH);
+    gl.uniform3fv(U.skyTop, cur.skyTop); gl.uniform3fv(U.skyHor, cur.skyHor); gl.uniform3fv(U.seaCol, cur.sea); gl.uniform3fv(U.sunCol, cur.sun);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  // ---------- the Mac mockup runs the app's own ocean page ----------
+  const macSea = $('macSea');
+  new IntersectionObserver((es, o) => { if (es[0].isIntersecting) {
+    macSea.src = `ocean.html?elapsed=${((performance.now() - t0) / 1000).toFixed(2)}&reduce=${reduce ? 1 : 0}`; o.disconnect(); } },
+    { rootMargin: '400px' }).observe(macSea);
+
+  // ---------- the breath takes the visitor's local light, like the app ----------
+  function localScene() {
+    const now = new Date(), jan = new Date(now.getFullYear(), 0, 1), jul = new Date(now.getFullYear(), 6, 1);
+    const dst = now.getTimezoneOffset() < Math.max(jan.getTimezoneOffset(), jul.getTimezoneOffset()) ? 1 : 0;
+    const dayLength = 12 + 3 * Math.sin(2 * Math.PI * (Math.floor((now - jan) / 864e5) - 80) / 365);
+    const noon = 12 + dst, rise = noon - dayLength / 2, set = noon + dayLength / 2, h = now.getHours() + now.getMinutes() / 60;
+    const el = h >= rise && h <= set ? Math.sin(Math.PI * (h - rise) / dayLength) : -Math.sin(Math.PI * ((h - set + 24) % 24) / (24 - dayLength));
+    const keys = [[-1, S('#030C14', '#15303F', '#05161F', '#DCE7EE', 0.09, 1, 1)], [-0.22, S('#0B1A2E', '#3B4A66', '#0A1E2B', '#C9D4E6', 0.05, 1, .6)],
+      [-0.04, S('#1E2A48', '#D0806A', '#15303F', '#FF9A6B', -0.004, 1, .15)], [0.1, S('#1F3D52', '#E8B08A', '#123A4A', '#FFC48A', 0.03, 1)],
+      [0.4, S('#3F7280', '#C4DCDA', '#174757', '#FFF1DE', 0.14, 1)], [1, S('#5A8A96', '#D9E9E6', '#1F5563', '#FFFFFF', 0.38, 1)]];
+    let i = 0; while (i < keys.length - 2 && el > keys[i + 1][0]) i++;
+    const [ea, a] = keys[i], [eb, b] = keys[i + 1], f = Math.min(Math.max((el - ea) / (eb - ea), 0), 1);
+    const m = (x, y) => x.map((v, j) => v + (y[j] - v) * f);
+    return { skyTop: m(a.skyTop, b.skyTop), skyHor: m(a.skyHor, b.skyHor), sea: m(a.sea, b.sea), sun: m(a.sun, b.sun),
+             sunH: a.sunH + (b.sunH - a.sunH) * f, calm: 1, stars: a.stars + (b.stars - a.stars) * f };
+  }
+
+  // ---------- act 1: the clutter sinks as you scroll ----------
+  const act1 = $('act1'), junk = [...document.querySelectorAll('.junk')], lines = [...document.querySelectorAll('#lines .line')];
+  const cursor = $('cur'), clockStart = performance.now();
+  function act1Frame(t) {
+    const r = act1.getBoundingClientRect(), span = r.height - innerHeight;
+    if (r.bottom < 0) return;
+    const p = Math.min(Math.max(-r.top / span, 0), 1);
+    const idx = p < .3 ? 0 : p < .62 ? 1 : 2;
+    lines.forEach((l, i) => l.classList.toggle('on', i === idx));
+    $('cue').style.opacity = p > .04 ? 0 : 1;
+    const settle = Math.min(Math.max((p - .6) / .36, 0), 1);
+    const jitter = (1 - settle) * (reduce ? 0 : 1);
+    junk.forEach((j, i) => {
+      const s = i * 1.7 + .3;
+      const dx = Math.sin(t * 2.3 + s * 3) * 6 * jitter, dy = Math.cos(t * 1.9 + s * 5) * 5 * jitter;
+      const sink = settle * innerHeight * (.55 + (i % 3) * .12);
+      j.style.transform = `translate(${dx}px,${dy + sink}px) rotate(${Math.sin(s) * 4 * settle}deg) scale(${1 - settle * .12})`;
+      j.style.opacity = Math.max(0, 1 - settle * 1.05);
+      j.style.filter = `blur(${settle * 10}px)`;
+    });
+    const x = innerWidth * (.5 + .3 * Math.sin(t * 1.3)), y = innerHeight * (.5 + .28 * Math.sin(t * 2.1 + 1));
+    cursor.style.transform = `translate(${x}px,${y + settle * innerHeight * .6}px)`;
+    cursor.style.opacity = 1 - settle;
+    const secs = Math.floor((performance.now() - clockStart) / 1000) + 4;
+    $('clock').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+  }
+
+  // ---------- act 2: the dare ----------
+  const act2 = $('act2'), ringFill = $('ringFill'), ringNum = $('ringNum'), dareMsg = $('dareMsg');
+  const C = 2 * Math.PI * 44; ringFill.style.strokeDasharray = C;
+  let lastInput = performance.now(), breathStart = 0, breaths = 0;
+  function dareInView() { const r = act2.getBoundingClientRect(); return r.top < innerHeight * .25 && r.bottom > innerHeight * .75; }
+  function poke() {
+    if (breathing) return;
+    if (performance.now() - lastInput > 1500 && dareInView()) dareMsg.textContent = 'You moved. Starting over';
+    lastInput = performance.now();
+  }
+  ['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach(e => addEventListener(e, poke, { passive: true }));
+  addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && Math.abs(e.movementX) + Math.abs(e.movementY) > 2) poke(); }, { passive: true });
+
+  const breath = $('breath'), word = $('word'), count = $('count'), tally = $('tally');
+  function startBreath() {
+    scenes.breath = localScene();
+    breathing = true; breathStart = performance.now(); breaths = 0;
+    document.body.classList.add('breathing'); breath.classList.add('on'); breath.focus({ preventScroll: true });
+    audio.boost(true);
+  }
+  function endBreath() {
+    if (!breathing) return;
+    breathing = false; document.body.classList.remove('breathing'); breath.classList.remove('on');
+    audio.boost(false);
+    const n = Math.max(1, breaths);
+    $('retKicker').textContent = 'That was Still';
+    $('retTitle').innerHTML = `You took ${n === 1 ? 'a breath' : n + ' breaths'}. <em>Imagine that every time your AI thinks.</em>`;
+    $('sharebox').hidden = false;
+    $('shareNote').textContent = 'A small image of your stillness, to post or keep.';
+    $('return').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
+    lastInput = performance.now();
+  }
+  breath.addEventListener('click', endBreath);
+  addEventListener('keydown', e => { if (breathing && ['Escape', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); endBreath(); } });
+  $('again').addEventListener('click', () => { lastInput = performance.now(); dareMsg.textContent = 'Hands off the mouse and keyboard'; });
+
+  // ---------- sound: generated live, off by default ----------
+  const audio = (() => {
+    let ac, master, surfGain, surfFilter, droneGain, on = false;
+    function build() {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      master = ac.createGain(); master.gain.value = 0; master.connect(ac.destination);
+      const len = ac.sampleRate * 4, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+      let last = 0; for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; last = (last + .02 * w) / 1.02; d[i] = last * 3.2; }
+      const src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
+      surfFilter = ac.createBiquadFilter(); surfFilter.type = 'lowpass'; surfFilter.frequency.value = 500;
+      surfGain = ac.createGain(); surfGain.gain.value = .25;
+      src.connect(surfFilter).connect(surfGain).connect(master); src.start();
+      droneGain = ac.createGain(); droneGain.gain.value = .35; droneGain.connect(master);
+      [[110, 0], [164.8, .06], [220, -.05], [329.6, .03]].forEach(([f, det], i) => {
+        const o = ac.createOscillator(); o.type = i === 3 ? 'triangle' : 'sine'; o.frequency.value = f; o.detune.value = det * 100;
+        const g = ac.createGain(); g.gain.value = [.05, .035, .025, .008][i]; o.connect(g).connect(droneGain); o.start();
+      });
+    }
+    return {
+      toggle() {
+        if (!ac) build();
+        on = !on; ac.resume();
+        master.gain.setTargetAtTime(on ? 1 : 0, ac.currentTime, .6);
+        return on;
+      },
+      update(x, calm) {
+        if (!ac || !on) return;
+        const now = ac.currentTime;
+        surfFilter.frequency.setTargetAtTime(260 + x * 900 + (1 - calm) * 500, now, .25);
+        surfGain.gain.setTargetAtTime(.12 + x * .22 + (1 - calm) * .12, now, .25);
+      },
+      boost(b) { if (ac) droneGain.gain.setTargetAtTime(b ? 1 : .35, ac.currentTime, 1.2); },
+    };
+  })();
+  $('sound').addEventListener('click', () => {
+    const on = audio.toggle();
+    $('sound').setAttribute('aria-pressed', on); $('soundLabel').textContent = on ? 'Sound on' : 'Sound off';
+    $('waves').setAttribute('opacity', on ? 1 : .35);
+    audio.boost(breathing);
+  });
+
+  // ---------- share card ----------
+  $('makeCard').addEventListener('click', async () => {
+    const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    if (glOK) { const sw = canvas.width, sh = canvas.height, s = Math.max(W / sw, H / sh); x.drawImage(canvas, (W - sw * s) / 2, (H - sh * s) / 2, sw * s, sh * s); }
+    else { x.fillStyle = '#071C29'; x.fillRect(0, 0, W, H); }
+    const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(7,28,41,.15)'); g.addColorStop(.55, 'rgba(7,28,41,.35)'); g.addColorStop(1, 'rgba(7,28,41,.88)');
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+    const n = Math.max(1, breaths);
+    x.fillStyle = '#E4EEEE';
+    x.font = '300 112px Newsreader'; x.fillText(`I took ${n === 1 ? 'a breath' : n + ' breaths'}`, 80, 930);
+    x.font = 'italic 300 112px Newsreader'; x.fillStyle = '#BDD9DA'; x.fillText('while my AI thought.', 80, 1056);
+    x.font = '500 28px "IBM Plex Mono"'; x.fillStyle = 'rgba(228,238,238,.75)'; x.fillText('STILL · BREATHE WHILE YOUR AI THINKS', 80, 1226);
+    x.font = '400 30px Figtree'; x.fillText(SITE_URL.replace(/^https?:\/\//, '').replace(/\/$/, ''), 80, 1276);
+    const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+    const file = new File([blob], 'my-stillness.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], text: "My Mac makes me breathe while my AI thinks.", url: SITE_URL }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'my-stillness.png'; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    $('shareNote').textContent = 'Saved. Post it with a link to this page.';
+  });
+
+  // ---------- reveals ----------
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: .2 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+  const rh = [...document.querySelectorAll('.rhythm')].map(el => ({ c: el.dataset.cycle.split(',').map(Number), s: [...el.querySelectorAll('.sweep')] }));
+
+  // ---------- one clock for everything ----------
+  const t0 = performance.now(); let prev = t0;
+  const words = { in: 'Breathe in', out: 'Breathe out', rest: 'Rest' };
+  const macWord = $('macWord');
+  function frame(now) {
+    const dt = Math.min((now - prev) / 1000, .1); prev = now;
+    const t = reduce ? 0 : (now - t0) / 1000;
+    sceneTarget = pickScene(); ease(dt);
+
+    let swell = 0;
+    if (breathing) {
+      const b = phase((now - breathStart) / 1000);
+      swell = reduce ? .5 : b.x;
+      if (word.dataset.p !== b.name) { word.dataset.p = b.name; word.textContent = words[b.name]; if (b.name === 'rest') breaths = b.n + 1; }
+      count.textContent = Math.ceil(b.left);
+      tally.textContent = breaths ? `${breaths} breath${breaths > 1 ? 's' : ''}` : '';
+    } else {
+      swell = reduce ? 0 : phase(t).x * .35 * cur.calm;
+      act1Frame((now - t0) / 1000);
+      if (dareInView()) {
+        const left = Math.max(0, DELAY - (now - lastInput) / 1000);
+        ringFill.style.strokeDashoffset = C * (left / DELAY);
+        ringNum.textContent = Math.ceil(left);
+        if (now - lastInput > 1500) dareMsg.textContent = left > 0 ? 'Keep still' : 'Here it comes';
+        if (left <= 0) startBreath();
+      } else { ringFill.style.strokeDashoffset = C; ringNum.textContent = DELAY; }
+    }
+    drawSea(t, swell);
+    audio.update(swell, cur.calm);
+
+    const mp = phase(t);
+    if (macWord.dataset.p !== mp.name) { macWord.dataset.p = mp.name; macWord.textContent = words[mp.name]; }
+    if (!reduce) for (const r of rh) { const [a, o, s] = r.c, p = t % (a + o + s);
+      const f = [Math.min(p / a, 1), p < a ? 0 : Math.min((p - a) / o, 1), s ? (p < a + o ? 0 : (p - a - o) / s) : 0];
+      r.s.forEach((el, i) => el.style.transform = `scaleX(${f[i]})`); }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

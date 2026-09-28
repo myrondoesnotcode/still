@@ -1,0 +1,143 @@
+<!doctype html>
+<!-- Still's breathing ocean. Loaded locally by the app; makes no network requests.
+     The same shader drives the website (website/dist/index.html). -->
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;height:100%;background:#0F3446;overflow:hidden}canvas{display:block;width:100%;height:100%}</style>
+</head><body><canvas id="sea"></canvas>
+<script id="fs" type="x-shader/x-fragment">
+precision highp float;
+uniform vec2 R; uniform float T; uniform float swell; uniform float stars;
+uniform vec3 skyTop, skyHor, seaCol, sunCol; uniform float sunH;
+const float calm = 1.0;
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+  return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y); }
+float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++){ v += a*noise(p); p = p*2.03 + 7.1; a *= 0.5; } return v; }
+float sea(vec2 p){
+  float chop = mix(1.0, 0.12, calm);
+  float h = 0.55*sin(p.x*0.18 + p.y*0.05 + T*0.35) + 0.30*sin(p.x*-0.09 + p.y*0.21 + T*0.27);
+  h += chop*(fbm(p*0.45 + vec2(T*0.12, T*0.07)) - 0.5)*1.6;
+  h += chop*0.5*(noise(p*1.7 - T*0.5) - 0.5);
+  return h;
+}
+vec3 sky(vec3 rd, vec3 sd){
+  float y = max(rd.y, 0.0);
+  vec3 c = mix(skyHor, skyTop, pow(y, 0.55));
+  float s = max(dot(rd, sd), 0.0);
+  c += sunCol*(pow(s, 900.0)*2.2 + pow(s, 24.0)*0.22 + pow(s, 4.0)*0.08);
+  float m = fbm(vec2(rd.x*3.0 + T*0.01, rd.y*14.0));
+  c = mix(c, skyHor*1.05, smoothstep(0.35, 0.0, y)*m*0.45);
+  vec2 g = floor(rd.xy*420.0);
+  c += stars*step(0.9965, hash(g))*smoothstep(0.02, 0.25, y)*(0.6 + 0.4*sin(T*1.7 + hash(g+3.0)*20.0));
+  return c;
+}
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5*R) / R.y;
+  float camH = 1.35 + swell*0.18;
+  float horizon = 0.06 - swell*0.025;
+  vec3 rd = normalize(vec3(uv.x, uv.y - horizon, 1.25));
+  vec3 sd = normalize(vec3(0.42, sunH, 1.0));
+  vec3 col;
+  if (rd.y >= 0.0) { col = sky(rd, sd); }
+  else {
+    float t = camH / -rd.y;
+    vec2 p = rd.xz*t + vec2(0.0, T*0.6);
+    float e = 0.02 + t*0.004, k = mix(0.55, 0.16, calm) + swell*0.05;
+    float h0 = sea(p), hx = sea(p + vec2(e, 0.0)), hz = sea(p + vec2(0.0, e));
+    vec3 n = normalize(vec3(-(hx - h0)/e*k, 1.0, -(hz - h0)/e*k));
+    vec3 rf = reflect(rd, n); rf.y = abs(rf.y);
+    float fres = 0.04 + 0.96*pow(1.0 - max(dot(-rd, n), 0.0), 5.0);
+    col = mix(seaCol*(0.55 + 0.35*swell), sky(rf, sd), fres);
+    col += sunCol*pow(max(dot(rf, sd), 0.0), mix(90.0, 700.0, calm))*mix(1.4, 2.6, calm);
+    col = mix(col, skyHor, 1.0 - exp(-t*0.018));
+  }
+  vec2 q = gl_FragCoord.xy / R;
+  col *= 0.78 + 0.22*pow(16.0*q.x*q.y*(1.0 - q.x)*(1.0 - q.y), 0.22);
+  col += (hash(gl_FragCoord.xy + fract(T)*97.0) - 0.5)*0.035;
+  gl_FragColor = vec4(pow(max(col, 0.0), vec3(0.95)), 1.0);
+}
+</script>
+<script>
+(() => {
+  // The app injects window.STILL = { inhale, exhale, rest, elapsed, reduce } before load.
+  // The website passes the same settings in the query string instead.
+  const query = Object.fromEntries([...new URLSearchParams(location.search)].map(([k, v]) => [k, k === 'reduce' ? v === '1' : +v]));
+  const cfg = Object.assign({ inhale: 5, exhale: 7, rest: 2, elapsed: 0, reduce: false }, query, window.STILL || {});
+  const canvas = document.getElementById('sea');
+  const gl = canvas.getContext('webgl', { antialias: false });
+  if (!gl) return;
+  const vs = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(vs, 'attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}'); gl.compileShader(vs);
+  const fs = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(fs, document.getElementById('fs').textContent); gl.compileShader(fs);
+  const pr = gl.createProgram(); gl.attachShader(pr, vs); gl.attachShader(pr, fs); gl.linkProgram(pr); gl.useProgram(pr);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(pr, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const U = {};
+  for (const n of ['R', 'T', 'swell', 'stars', 'skyTop', 'skyHor', 'seaCol', 'sunCol', 'sunH']) U[n] = gl.getUniformLocation(pr, n);
+
+  // ---- light follows the local clock ----
+  // No location: estimate the sun from the date and time zone (solar noon near 12:00,
+  // shifted for daylight saving; day length from the season at mid-northern latitudes).
+  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+  const K = (el, skyTop, skyHor, sea, sun, sunH, stars) => ({ el, skyTop: hex(skyTop), skyHor: hex(skyHor), sea: hex(sea), sun: hex(sun), sunH, stars });
+  const keys = [                                   // el: sun height, -1 midnight … 1 noon
+    K(-1.00, '#030C14', '#15303F', '#05161F', '#DCE7EE', 0.09, 1.0),   // night, moonlight
+    K(-0.22, '#0B1A2E', '#3B4A66', '#0A1E2B', '#C9D4E6', 0.05, 0.6),   // blue hour
+    K(-0.04, '#1E2A48', '#D0806A', '#15303F', '#FF9A6B', -0.004, 0.15), // sunrise / sunset glow
+    K( 0.10, '#1F3D52', '#E8B08A', '#123A4A', '#FFC48A', 0.03, 0.0),   // golden hour
+    K( 0.40, '#3F7280', '#C4DCDA', '#174757', '#FFF1DE', 0.14, 0.0),   // morning / late afternoon
+    K( 1.00, '#5A8A96', '#D9E9E6', '#1F5563', '#FFFFFF', 0.38, 0.0),   // midday
+  ];
+  function sunElevation(now) {
+    const jan = new Date(now.getFullYear(), 0, 1), jul = new Date(now.getFullYear(), 6, 1);
+    const dst = now.getTimezoneOffset() < Math.max(jan.getTimezoneOffset(), jul.getTimezoneOffset()) ? 1 : 0;
+    const doy = Math.floor((now - jan) / 864e5);
+    const dayLength = 12 + 3 * Math.sin(2 * Math.PI * (doy - 80) / 365);
+    const noon = 12 + dst, rise = noon - dayLength / 2, set = noon + dayLength / 2;
+    const h = cfg.hour ?? now.getHours() + now.getMinutes() / 60;
+    if (h >= rise && h <= set) return Math.sin(Math.PI * (h - rise) / dayLength);
+    const night = 24 - dayLength, since = (h - set + 24) % 24;
+    return -Math.sin(Math.PI * since / night);
+  }
+  function scene(el) {
+    let i = 0; while (i < keys.length - 2 && el > keys[i + 1].el) i++;
+    const a = keys[i], b = keys[i + 1], f = Math.min(Math.max((el - a.el) / (b.el - a.el), 0), 1);
+    const m = (x, y) => x.map((v, j) => v + (y[j] - v) * f);
+    return { skyTop: m(a.skyTop, b.skyTop), skyHor: m(a.skyHor, b.skyHor), sea: m(a.sea, b.sea), sun: m(a.sun, b.sun),
+             sunH: a.sunH + (b.sunH - a.sunH) * f, stars: a.stars + (b.stars - a.stars) * f };
+  }
+  let light = scene(sunElevation(new Date())), lightAt = 0;
+  function resize() {
+    // Rendered below native resolution: the grain and softness hide it, and it saves battery.
+    const s = Math.min(devicePixelRatio || 1, 2) * 0.55;
+    canvas.width = Math.round(innerWidth * s); canvas.height = Math.round(innerHeight * s);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  resize(); addEventListener('resize', resize);
+  // Same clock as the app's BreathPhase: eased inhale, eased exhale, then rest.
+  function expansion(s) {
+    const a = Math.max(1, cfg.inhale), o = Math.max(1, cfg.exhale), r = Math.max(0, cfg.rest);
+    const p = s % (a + o + r);
+    if (p < a) return (1 - Math.cos(p / a * Math.PI)) / 2;
+    if (p < a + o) return 1 - (1 - Math.cos((p - a) / o * Math.PI)) / 2;
+    return 0;
+  }
+  function draw(t, swell) {
+    if (t - lightAt > 30 || t < lightAt) { light = scene(sunElevation(new Date())); lightAt = t; }
+    gl.uniform2f(U.R, canvas.width, canvas.height); gl.uniform1f(U.T, t); gl.uniform1f(U.swell, swell);
+    gl.uniform3fv(U.skyTop, light.skyTop); gl.uniform3fv(U.skyHor, light.skyHor); gl.uniform3fv(U.seaCol, light.sea);
+    gl.uniform3fv(U.sunCol, light.sun); gl.uniform1f(U.sunH, light.sunH); gl.uniform1f(U.stars, light.stars);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  if (cfg.reduce) { draw(0, 0.5); addEventListener('resize', () => draw(0, 0.5)); return; }
+  const t0 = performance.now() / 1000 - cfg.elapsed;
+  (function frame() {
+    const t = performance.now() / 1000 - t0;
+    draw(t, expansion(t));
+    requestAnimationFrame(frame);
+  })();
+})();
+</script>
+</body></html>
